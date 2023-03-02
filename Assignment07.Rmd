@@ -1,0 +1,154 @@
+---
+title: "Assignment 07"
+author: "Martina Mileva"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+**Dragon 1:** 
+
+```{r, echo=FALSE}
+knitr::include_graphics("Dragon 1.jpg")
+```
+
+**Fig. 1.** Princess and dragon (Maja Lindberg 2012). <https://2.bp.blogspot.com/-AMN4CpuIs2g/U0U7BiPd1DI/AAAAAAABWFQ/B0hzdHjfa48/s1600/princesa+i+drac_Maja+Lindberg.jpg>
+
+
+**Dragon 2:** 
+
+```{r, echo=FALSE}
+knitr::include_graphics("Dragon 2.jpg")
+```
+
+**Fig. 2.** Dragon animation (Nathan Hale 2022). <https://tmblr.co/ZyPYmx5JYI79>
+
+
+**Dragon 3:** 
+
+```{r, echo=FALSE}
+knitr::include_graphics("Dragon 3.jpg")
+```
+
+**Fig. 3.** Copper Dragon (Stanley Morrison 2008). <https://fineartamerica.com/featured/copper-dragon-stanley-morrison.html>
+
+
+```{r}
+library(ape)
+library(ggplot2)
+library(reshape2)
+library(ggtree)
+```
+
+
+Loading and appending dragons to the nexus dataset:
+
+```{r}
+Nexus <- read.nexus.data("DragonMatrix.nex.txt")
+
+ApNex <- append(Nexus, '75NewDrag1')
+ApNex <- append(ApNex, '76NewDrag2')
+ApNex <- append(ApNex, '77NewDrag3')
+
+names(ApNex) <- c(names(Nexus), "75NewDrag1", "76NewDrag2", "77NewDrag3")
+
+write.nexus.data(ApNex, "ApNex.nex.txt")
+```
+
+
+**Characteristics for new dragons were inputted in Notepad.**
+
+
+Loading the fully appended data:
+
+```{r}
+Dat <- read.nexus.data("ApNex2.nex.txt")
+```
+
+
+Applying trait weightings:
+
+```{r}
+WeightsDat <- read.csv("Weights.csv")
+
+# Creating single vector of weights
+
+Weights <- paste0(WeightsDat$Weight,collapse="")
+Weights <- strsplit(Weights,split="")[[1]]
+
+# Converting each letter to a value
+
+WeightsNum <- rep(NA,length(Weights))
+for(i in 1:length(WeightsNum)){
+  if(Weights[i] %in% LETTERS){
+    WeightsNum[i] <- which(LETTERS==Weights[i])+9
+  } else {
+    WeightsNum[i]<-Weights[i]
+  }
+}
+
+WeightsNum <- as.numeric(WeightsNum)
+
+length(WeightsNum) # Same as number of characters
+
+# Multiplying weight value by trait vector for each dragon
+
+WtDat <- Dat
+for (i in 1:length(Dat)){
+  RepWeight <- Dat[[i]]==1
+  WtDat[[i]][RepWeight] <- WeightsNum[RepWeight]
+  RepWeight <- NA
+}
+```
+
+
+Converting to `data.frame` object:
+
+```{r}
+DF <- data.frame(matrix(unlist(WtDat),ncol=78,byrow=T))
+row.names(DF) <- names(WtDat)
+head(DF)
+```
+
+
+Calculating the distance matrix:
+
+```{r}
+Dist <- dist(DF, method='euclidean')
+
+DistMat <- as.matrix(Dist)
+
+print(DistMat)
+```
+
+
+Visualizing distance matrix with ggplot:
+
+```{r}
+DistVis <- melt(DistMat)
+
+ggplot(DistVis, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours=c("white","blue","green","red")) +
+  theme(axis.text.x = element_text(angle=90, hjust=1, vjust=0.5))
+```
+
+
+Creating the phylogeny:
+
+```{r}
+DragonTree <- nj(Dist)
+
+# Formatting the tree
+
+Origin <- gsub("[0-9\\.]+([^X]+)X*","\\1", DragonTree$tip.label)
+
+OriginGroups <- split(DragonTree$tip.label, Origin)
+
+DTcol <- groupOTU(DragonTree, OriginGroups)
+
+# Create tree
+
+ggtree(DTcol, layout="circular",aes(colour=group)) + geom_tiplab(size=2,aes(angle=angle)) + scale_color_manual(values=c(NewDrag1 = "red", NewDrag2 = "red", NewDrag3 = "red")) 
+```
+
+**Fig. 4.** Dragon phylogeny with the new additions displayed in red. These three new dragons form a monophyletic clade. 
